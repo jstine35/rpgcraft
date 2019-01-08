@@ -997,8 +997,8 @@ StInl void i_xorpd  (__m128& dest)                      { dest = DtoF(_mm_xor_pd
 StInl void i_pcmpeq (__m128& dest)                      { dest = ItoF(_mm_cmpeq_epi8    (_mm_undefined_si128(), _mm_undefined_si128()));    }
 #else
 StInl void i_pxor   (__m128& dest)                      { dest = ItoF(_mm_set1_epi8(  0 )); }
-StInl void i_xorps  (__m128& dest)                      { dest = FtoF(_mm_set1_epi8(  0 )); }
-StInl void i_xorpd  (__m128& dest)                      { dest = DtoF(_mm_set1_epi8(  0 )); }
+StInl void i_xorps  (__m128& dest)                      { dest = FtoF(_mm_set1_ps  (  0 )); }
+StInl void i_xorpd  (__m128& dest)                      { dest = DtoF(_mm_set1_pd  (  0 )); }
 StInl void i_pcmpeq (__m128& dest)                      { dest = ItoF(_mm_set1_epi8( -1 )); }
 #endif
 // --------------------------------------------------------------------------------------

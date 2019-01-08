@@ -269,8 +269,8 @@ inline __ai void xObjCopy( T& dest, const T2& src )
 template< typename T, typename T2 >
 inline __ai int xObjCompare( const T& left, const T2& right )
 {
-    static_assert(__is_trivially_copyable(T),   "This is not a trivially-copyable object!");
-    static_assert(__is_trivially_copyable(T2),  "This is not a trivially-copyable object!");
+    static_assert(xIs_trivially_copyable(T),   "This is not a trivially-copyable object!");
+    static_assert(xIs_trivially_copyable(T2),  "This is not a trivially-copyable object!");
     static_assert( sizeof(T) == sizeof(T2),     "Objects are not of the same size!");
 
     return xMemCmp(&left, &right, sizeof(T));
