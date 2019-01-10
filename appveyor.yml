@@ -10,6 +10,9 @@ install:
   # by default, all script lines are interpreted as batch
   cmd: echo ajek appveyor test
 
+# Build worker image (VM template)
+image: Visual Studio 2017
+
 build:
   parallel: true                  # enable MSBuild parallel builds
   project: rpgcraft.sln
