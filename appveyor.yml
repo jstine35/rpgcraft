@@ -21,46 +21,14 @@ shallow_clone: true
 
 
 # scripts that run after cloning repository
-# note that 'cmd:' scripts run on Windows nodes and that 'sh:' scripts run on linux nodes
-# scripts that start with hyphen (-) run on both, but there's very few commands that work
-# on both shells (pretty much just cd/echo, and perhaps some cross-platform executables such
-# as git).  The good news is that AppVeryor Windows images have MSYS2 installed by default,
-# whcih means we can use bash scripts for everything and then just provide a .bat file
-# trampoline that invokes our bash scripts under MSYS2.  So easy!  --jstine
-#
-# Note also, env vars 'CI_WINDOWS' and 'CI_LINUX' will be set true/false accordingly.
-# (apparently both vars actually set for both images so you must explicitly check for 'true'
-#  vs the usual pattern of checking if a var is non-empty)
 install:
+  # by default, all script lines are interpreted as batch
   cmd: echo ajek appveyor test v2
 
 # Build worker image (VM template)
-image: Visual Studio 2015
-#image: Ubuntu1804
+image: Visual Studio 2017
 
 build:
   parallel: true                  # enable MSBuild parallel builds
   project: rpgcraft.sln
 
-platform:
-  - x64
-
-configuration:
-  - Release
-
-
-# Tell AppVeyor to use makefile on linux image. [WIP - UNTESTED]
-# This snippet will only become effective once a Ubuntu image is enabled (see above)
-# 
-# This implements a 'for.matrix.only/.except' construct, which is the most complicated part of
-# any appveyor.yml.  It's a special syntax where-in the 'matrix' item is used as a conditional
-# filter for all other items specified within the for-block.
-for:
--
-  matrix:
-    only:
-      - image: Ubuntu
-
-  # 'build_script' to run custom scripts instead of automatic MSBuild
-  build_script:
-    - make
