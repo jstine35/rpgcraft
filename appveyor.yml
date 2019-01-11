@@ -35,7 +35,7 @@ install:
   cmd: echo ajek appveyor test v2
 
 # Build worker image (VM template)
-image: Visual Studio 2017
+image: Visual Studio 2015
 #image: Ubuntu1804
 
 build:
