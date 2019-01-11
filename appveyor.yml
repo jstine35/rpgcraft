@@ -4,7 +4,7 @@
 # this file.  This "version" just needs to be something that effectively references back to the
 # AppVeyor job.  instead just use the build number, which should always be unique unless it's changed
 # manually in the project settings.
-version: {build}
+version: "{build}"
 
 # branches to build
 # This list should only consists of branches which are expected to be the target of PRs
