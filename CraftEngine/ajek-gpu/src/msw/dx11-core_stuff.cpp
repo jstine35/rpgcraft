@@ -576,13 +576,13 @@ void dx11_InitDevice()
         }
 
         DXGI_SWAP_CHAIN_DESC1 sd = {};
+        sd.BufferCount          = BackBufferCount;
         sd.Width                = g_client_size_pix.x;
         sd.Height               = g_client_size_pix.y;
         sd.Format               = DXGI_FORMAT_R8G8B8A8_UNORM;
         sd.SampleDesc.Count     = 1;
         sd.SampleDesc.Quality   = 0;
         sd.BufferUsage          = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-        sd.BufferCount          = 1;
 
         hr = dxgiFactory2->CreateSwapChainForHwnd(g_pd3dDevice, g_hWnd, &sd, nullptr, nullptr, &g_pSwapChain1);
         if (SUCCEEDED(hr))
@@ -620,12 +620,14 @@ void dx11_InitDevice()
     x_abort_on(FAILED(hr));
 
     pragma_todo("Implement and expose render target API.");
+
     auto&   rtView  = ptr_cast<ID3D11RenderTargetView*&>(g_gpu_BackBuffer.m_driverData);
     hr = g_pd3dDevice->CreateRenderTargetView(pBackBuffer, nullptr, &rtView);
     dx11_ManageObject(rtView);      // rtView is managed due to OMSetRenderTargets
     dx11_ReleaseLocal(pBackBuffer);
     x_abort_on(FAILED(hr));
 
+    pragma_todo("Create more than one backbuffer and create rendertargets and rendertargetviews for them");
     g_pImmediateContext->OMSetRenderTargets(1, &rtView, nullptr);
 
     // TODO : Implement Sampler Binding API?  The most liekly variances are LINEAR/POINT sampling
