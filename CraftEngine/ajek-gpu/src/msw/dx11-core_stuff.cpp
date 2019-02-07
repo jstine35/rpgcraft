@@ -563,20 +563,24 @@ void dx11_InitDevice()
     }
     x_abort_on (hr);
 
-    // Create swap chain
-    IDXGIFactory2* dxgiFactory2 = nullptr;
-    hr = dxgiFactory->QueryInterface(__uuidof(IDXGIFactory2), ptr_cast<void**>(&dxgiFactory2));
-    if (dxgiFactory2)
+    const bool s_disable_swapchain = true;
+
+    if (!s_disable_swapchain)
     {
-        // DirectX 11.1 or later
-        hr = g_pd3dDevice->QueryInterface(__uuidof(ID3D11Device1), ptr_cast<void**>(&g_pd3dDevice1));
-        if (SUCCEEDED(hr))
+        // Create swap chain
+        IDXGIFactory2* dxgiFactory2 = nullptr;
+        hr = dxgiFactory->QueryInterface(__uuidof(IDXGIFactory2), ptr_cast<void**>(&dxgiFactory2));
+        if (dxgiFactory2)
         {
-            (void)g_pImmediateContext->QueryInterface(__uuidof(ID3D11DeviceContext1), ptr_cast<void**>(&g_pImmediateContext1));
-        }
+            // DirectX 11.1 or later
+            hr = g_pd3dDevice->QueryInterface(__uuidof(ID3D11Device1), ptr_cast<void**>(&g_pd3dDevice1));
+            if (SUCCEEDED(hr))
+            {
+                (void)g_pImmediateContext->QueryInterface(__uuidof(ID3D11DeviceContext1), ptr_cast<void**>(&g_pImmediateContext1));
+            }
 
         DXGI_SWAP_CHAIN_DESC1 sd = {};
-        sd.BufferCount          = BackBufferCount;
+        sd.BufferCount          = 1;
         sd.Width                = g_client_size_pix.x;
         sd.Height               = g_client_size_pix.y;
         sd.Format               = DXGI_FORMAT_R8G8B8A8_UNORM;
@@ -584,40 +588,48 @@ void dx11_InitDevice()
         sd.SampleDesc.Quality   = 0;
         sd.BufferUsage          = DXGI_USAGE_RENDER_TARGET_OUTPUT;
 
-        hr = dxgiFactory2->CreateSwapChainForHwnd(g_pd3dDevice, g_hWnd, &sd, nullptr, nullptr, &g_pSwapChain1);
-        if (SUCCEEDED(hr))
+            hr = dxgiFactory2->CreateSwapChainForHwnd(g_pd3dDevice, g_hWnd, &sd, nullptr, nullptr, &g_pSwapChain1);
+            if (SUCCEEDED(hr))
+            {
+                hr = g_pSwapChain1->QueryInterface(__uuidof(IDXGISwapChain), ptr_cast<void**>(&g_pSwapChain));
+            }
+
+            dx11_ReleaseLocal(dxgiFactory2);
+        } else
         {
-            hr = g_pSwapChain1->QueryInterface(__uuidof(IDXGISwapChain), ptr_cast<void**>(&g_pSwapChain));
+            // DirectX 11.0 systems
+            DXGI_SWAP_CHAIN_DESC sd = {};
+            sd.BufferCount          = 1;
+            sd.BufferDesc.Width     = g_client_size_pix.x;
+            sd.BufferDesc.Height    = g_client_size_pix.y;
+            sd.BufferDesc.Format    = DXGI_FORMAT_R8G8B8A8_UNORM;
+            sd.BufferDesc.RefreshRate.Numerator = 60;
+            sd.BufferDesc.RefreshRate.Denominator = 1;
+            sd.BufferUsage          = DXGI_USAGE_RENDER_TARGET_OUTPUT;
+            sd.OutputWindow         = g_hWnd;
+            sd.SampleDesc.Count     = BackBufferCount;
+            sd.SampleDesc.Quality   = 0;
+            sd.Windowed             = TRUE;
+
+            hr = dxgiFactory->CreateSwapChain(g_pd3dDevice, &sd, &g_pSwapChain);
         }
-
-        dx11_ReleaseLocal(dxgiFactory2);
-    } else
-    {
-        // DirectX 11.0 systems
-        DXGI_SWAP_CHAIN_DESC sd = {};
-        sd.BufferCount          = 1;
-        sd.BufferDesc.Width     = g_client_size_pix.x;
-        sd.BufferDesc.Height    = g_client_size_pix.y;
-        sd.BufferDesc.Format    = DXGI_FORMAT_R8G8B8A8_UNORM;
-        sd.BufferDesc.RefreshRate.Numerator = 60;
-        sd.BufferDesc.RefreshRate.Denominator = 1;
-        sd.BufferUsage          = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-        sd.OutputWindow         = g_hWnd;
-        sd.SampleDesc.Count     = 1;
-        sd.SampleDesc.Quality   = 0;
-        sd.Windowed             = TRUE;
-
-        hr = dxgiFactory->CreateSwapChain(g_pd3dDevice, &sd, &g_pSwapChain);
+        x_abort_on(FAILED(hr));
     }
-    x_abort_on(FAILED(hr));
 
-    // Note this tutorial doesn't handle full-screen swapchains so we block the ALT+ENTER shortcut
+    // When it comes time to handle ALT-ENTER, we'll do it by blowing the GDI window up to full-screen
+    // and removing all decorations, vs. the dodgy microsoft built-into-the-driver hack. --jstine
+
     dxgiFactory->MakeWindowAssociation(g_hWnd, DXGI_MWA_NO_ALT_ENTER);
     dx11_ReleaseLocal(dxgiFactory);
 
     ID3D11Texture2D* pBackBuffer = nullptr;
-    hr = g_pSwapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), ptr_cast<void**>(&pBackBuffer));
-    x_abort_on(FAILED(hr));
+    if (g_pSwapChain) {
+        hr = g_pSwapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), ptr_cast<void**>(&pBackBuffer));
+        x_abort_on(FAILED(hr));
+    }
+    else {
+
+    }
 
     pragma_todo("Implement and expose render target API.");
 
