@@ -52,6 +52,7 @@ static IDXGISwapChain1*         g_pSwapChain1           = nullptr;
 
 
 GPU_RenderTarget        g_gpu_BackBuffer;
+
 int                     g_curBufferIdx = 0;
 
 // -----------------------------------------------------------------------------------------------
@@ -579,14 +580,14 @@ void dx11_InitDevice()
                 (void)g_pImmediateContext->QueryInterface(__uuidof(ID3D11DeviceContext1), ptr_cast<void**>(&g_pImmediateContext1));
             }
 
-        DXGI_SWAP_CHAIN_DESC1 sd = {};
-        sd.BufferCount          = 1;
-        sd.Width                = g_client_size_pix.x;
-        sd.Height               = g_client_size_pix.y;
-        sd.Format               = DXGI_FORMAT_R8G8B8A8_UNORM;
-        sd.SampleDesc.Count     = 1;
-        sd.SampleDesc.Quality   = 0;
-        sd.BufferUsage          = DXGI_USAGE_RENDER_TARGET_OUTPUT;
+            DXGI_SWAP_CHAIN_DESC1 sd = {};
+            sd.BufferCount          = 1;
+            sd.Width                = g_client_size_pix.x;
+            sd.Height               = g_client_size_pix.y;
+            sd.Format               = DXGI_FORMAT_R8G8B8A8_UNORM;
+            sd.SampleDesc.Count     = 1;
+            sd.SampleDesc.Quality   = 0;
+            sd.BufferUsage          = DXGI_USAGE_RENDER_TARGET_OUTPUT;
 
             hr = dxgiFactory2->CreateSwapChainForHwnd(g_pd3dDevice, g_hWnd, &sd, nullptr, nullptr, &g_pSwapChain1);
             if (SUCCEEDED(hr))
@@ -607,7 +608,7 @@ void dx11_InitDevice()
             sd.BufferDesc.RefreshRate.Denominator = 1;
             sd.BufferUsage          = DXGI_USAGE_RENDER_TARGET_OUTPUT;
             sd.OutputWindow         = g_hWnd;
-            sd.SampleDesc.Count     = BackBufferCount;
+            sd.SampleDesc.Count     = 1;
             sd.SampleDesc.Quality   = 0;
             sd.Windowed             = TRUE;
 
@@ -623,12 +624,40 @@ void dx11_InitDevice()
     dx11_ReleaseLocal(dxgiFactory);
 
     ID3D11Texture2D* pBackBuffer = nullptr;
+    //ID3D11RenderTargetView* m_backBufferView = nullptr;
     if (g_pSwapChain) {
         hr = g_pSwapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), ptr_cast<void**>(&pBackBuffer));
         x_abort_on(FAILED(hr));
     }
     else {
+        // Setup the render target texture description.
+        D3D11_TEXTURE2D_DESC textureDesc = {};
+        textureDesc.Width               = g_client_size_pix.x;
+        textureDesc.Height              = g_client_size_pix.y;
+        textureDesc.MipLevels           = 1;
+        textureDesc.ArraySize           = 1;
+        textureDesc.Format              = DXGI_FORMAT_R16G16B16A16_UNORM;
+        textureDesc.SampleDesc.Count    = 1;
+        textureDesc.Usage               = D3D11_USAGE_DEFAULT;
+        textureDesc.BindFlags           = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
+        textureDesc.CPUAccessFlags      = 0;
+        textureDesc.MiscFlags           = 0;
 
+        // Create the render target texture.
+        hr = g_pd3dDevice->CreateTexture2D(&textureDesc, NULL, &pBackBuffer);
+        x_abort_on(FAILED(hr));
+
+        #if 0
+        // Setup the description of the render target view.
+        D3D11_RENDER_TARGET_VIEW_DESC renderTargetViewDesc = {};
+        renderTargetViewDesc.Format = textureDesc.Format;
+        renderTargetViewDesc.ViewDimension = D3D11_RTV_DIMENSION_TEXTURE2D;
+        renderTargetViewDesc.Texture2D.MipSlice = 0;
+
+        // Create the render target view.
+        hr = g_pd3dDevice->CreateRenderTargetView(pBackBuffer, &renderTargetViewDesc, &m_backBufferView);
+        x_abort_on(FAILED(hr));
+        #endif
     }
 
     pragma_todo("Implement and expose render target API.");
@@ -1187,13 +1216,57 @@ void dx11_UpdateConstantBuffer(const GPU_ConstantBuffer& buffer, const void* dat
     // of the input data.
 }
 
+#include "x-png-encode.h"
+extern xString xGetTempDir();
+
 void dx11_SubmitFrameAndSwap()
 {
     // Keyboard poll runs async currently along with pads, so there's a slim chance
     // the ImGui focus state would be out of sync for a single frame.  Probably OK.
     KPad_SetKeyboardFocus(!ImGui::GetIO().WantCaptureKeyboard);
 
-    g_pSwapChain->Present(0, 0);
+    if (g_pSwapChain) {
+        g_pSwapChain->Present(0, 0);
+    }
+    else {
+        g_pImmediateContext->Flush();
+
+        if (1) {
+            HRESULT hr;
+            ID3D11Resource* backbufferRes;
+            auto& rtView = ptr_cast<ID3D11RenderTargetView*&>(g_gpu_BackBuffer.m_driverData);
+            rtView->GetResource(&backbufferRes);
+
+            D3D11_TEXTURE2D_DESC desc = {};
+            ((ID3D11Texture2D*)(backbufferRes))->GetDesc( &desc );
+            desc.BindFlags = 0;
+            desc.Format = DXGI_FORMAT_R16G16B16A16_UNORM;
+            desc.MiscFlags &= D3D11_RESOURCE_MISC_TEXTURECUBE;
+            desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
+            desc.Usage = D3D11_USAGE_STAGING;
+
+            ID3D11Texture2D* pStaging;
+            hr = g_pd3dDevice->CreateTexture2D( &desc, 0, &pStaging);
+            x_abort_on(FAILED(hr) || !pStaging);
+
+            g_pImmediateContext->CopyResource( pStaging, backbufferRes );
+            g_pImmediateContext->Flush();
+
+            D3D11_MAPPED_SUBRESOURCE subres;
+            hr = g_pImmediateContext->Map(pStaging, 0, D3D11_MAP_READ, 0, &subres);
+            x_abort_on(FAILED(hr));
+
+            x_png_enc pngenc;
+            static int count = 0;
+            pngenc.WriteImage(subres.pData, desc.Width, desc.Height, 64);
+            pngenc.Cvt64to24();
+            //pngenc.ClearAlphaChannel(255);
+            pngenc.SaveImage(xGetTempDir() + xFmtStr("/screen%d.png", count++));
+            g_pImmediateContext->Unmap(pStaging, 0);
+            backbufferRes->Release();
+            pStaging->Release();
+        }
+    }
     g_curBufferIdx = (g_curBufferIdx+1) % BackBufferCount;
 }
 
